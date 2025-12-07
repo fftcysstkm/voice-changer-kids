@@ -1,50 +1,47 @@
-# Welcome to your Expo app 👋
+# Voice Changer Kids
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+子供向けのボイスチェンジャーアプリです。
+声を録音し、「Monster（低い声）」「Normal（普通）」「Alien（高い声）」のエフェクトをかけて再生できます。
 
-## Get started
+## 開発環境での実行方法 (Development)
 
-1. Install dependencies
+このプロジェクトは Expo を使用しています。
+WSL (Windows Subsystem for Linux) 環境で開発する場合、ネットワーク接続の問題を回避するために `--tunnel` オプションの使用を推奨します。
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
+### 1. 依存関係のインストール
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. アプリの起動 (WSL/Tunnelモード)
+以下のコマンドを実行すると、QRコードが表示されます。
+Expo GoアプリでQRコードを読み取って実行してください。
 
-## Learn more
+```bash
+npx expo start --tunnel
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+> **Note**: 初回実行時に `@expo/ngrok` のインストールを求められる場合がありますが、画面の指示に従ってインストールしてください。
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## クラウドでのビルド方法 (EAS Build)
 
-## Join the community
+スマホに直接インストールできるアプリ (APKファイル) を作成するには、EAS Build を使用します。
 
-Join our community of developers creating universal apps.
+### 1. Expo CLI へのログイン
+ビルドには Expo アカウントが必要です。
+```bash
+npx eas-cli login
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### 2. ビルドの実行 (Android)
+以下のコマンドでクラウドビルドを開始します。
+```bash
+npx eas-cli build -p android --profile preview
+```
+
+ビルドが完了すると、ターミナルにQRコードが表示されます。
+これを Android 端末で読み取ることで、アプリを直接インストールして動作確認ができます。
+
+## 機能
+- **録音**: マイクボタンをタップして録音開始/停止。
+- **再生**: エフェクトボタン (Monster/Normal/Alien) をタップすると、即座にその声色で再生されます。
