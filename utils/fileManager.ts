@@ -3,6 +3,23 @@ import { Directory, File, Paths } from 'expo-file-system';
 // We define usage of the 'recordings/' subdirectory within the document directory.
 const recordingsDir = new Directory(Paths.document, 'recordings');
 
+const pad = (value: number, length = 2) => String(value).padStart(length, '0');
+
+const formatRecordingTimestamp = (date: Date) => {
+    const datePart = [
+        date.getFullYear(),
+        pad(date.getMonth() + 1),
+        pad(date.getDate()),
+    ].join('');
+    const timePart = [
+        pad(date.getHours()),
+        pad(date.getMinutes()),
+        pad(date.getSeconds()),
+    ].join('');
+
+    return `${datePart}-${timePart}-${pad(date.getMilliseconds(), 3)}`;
+};
+
 export const ensureDirExists = async () => {
     if (!recordingsDir.exists) {
         recordingsDir.create();
@@ -44,8 +61,7 @@ export const renameRecording = async (oldName: string, newName: string) => {
 
 export const saveRecording = async (uri: string) => {
     await ensureDirExists();
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `recording-${timestamp}.m4a`;
+    const filename = `${formatRecordingTimestamp(new Date())}.m4a`;
 
     // The source uri might be in cache or elsewhere. 
     // We create a File object for the source.
