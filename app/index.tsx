@@ -1,123 +1,81 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert, Platform } from 'react-native';
-import { Audio } from 'expo-av';
+import { useVoicePlayer } from '@/hooks/useVoicePlayer';
+import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { FontAwesome } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Alert, Animated, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function VoiceChangerApp() {
-    const [recording, setRecording] = useState<Audio.Recording | null>(null);
-    const [audioUri, setAudioUri] = useState<string | null>(null);
-    const [selectedPitch, setSelectedPitch] = useState<'LOW' | 'NORMAL' | 'HIGH'>('NORMAL');
-    const [sound, setSound] = useState<Audio.Sound | null>(null);
-    const [permissionResponse, requestPermission] = Audio.usePermissions();
+    const router = useRouter();
+    const { recording, startRecording, stopRecording, latestRecordingUri } = useVoiceRecorder();
+    const { playSound, stopSound, isPlaying, playingUri } = useVoicePlayer();
 
+    // State for showing the "Saved" message
+    const [showSavedMessage, setShowSavedMessage] = useState(false);
+    const fadeAnim = useState(new Animated.Value(0))[0];
+
+    // Use a local effect for the 30s timer
     useEffect(() => {
-        // Configure audio mode for recording and playback
-        async function configureAudio() {
-            try {
-                await Audio.setAudioModeAsync({
-                    allowsRecordingIOS: true,
-                    playsInSilentModeIOS: true,
-                    staysActiveInBackground: false,
-                    shouldDuckAndroid: true,
-                    playThroughEarpieceAndroid: false,
-                });
-            } catch (error) {
-                console.error('Failed to set audio mode', error);
-            }
+        let timer: ReturnType<typeof setTimeout>;
+        if (recording) {
+            timer = setTimeout(async () => {
+                await stopRecording();
+                Alert.alert('お知らせ', '30秒経過したため録音を終了しました');
+            }, 30000);
         }
-        configureAudio();
-    }, []);
+        return () => {
+            if (timer) clearTimeout(timer);
+        };
+    }, [recording]);
 
-    // Cleanup sound on unmount or change
+    // Effect to handle "Saved" message visibility and fading
     useEffect(() => {
-        return sound
-            ? () => {
-                sound.unloadAsync();
-            }
-            : undefined;
-    }, [sound]);
+        if (latestRecordingUri) {
+            setShowSavedMessage(true);
+            // Fade in
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 500,
+                useNativeDriver: true,
+            }).start();
 
-    async function startRecording() {
-        try {
-            if (permissionResponse?.status !== 'granted') {
-                const response = await requestPermission();
-                if (response.status !== 'granted') {
-                    Alert.alert('Permission needed', 'Please grant microphone permission to record voice.');
-                    return;
-                }
-            }
+            // Hide after 3 seconds
+            const hideTimer = setTimeout(() => {
+                Animated.timing(fadeAnim, {
+                    toValue: 0,
+                    duration: 500,
+                    useNativeDriver: true,
+                }).start(() => setShowSavedMessage(false));
+            }, 3000);
 
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: true,
-                playsInSilentModeIOS: true,
-            });
-
-            const { recording } = await Audio.Recording.createAsync(
-                Audio.RecordingOptionsPresets.HIGH_QUALITY
-            );
-            setRecording(recording);
-        } catch (err) {
-            console.error('Failed to start recording', err);
-            Alert.alert('Error', 'Failed to start recording');
+            return () => clearTimeout(hideTimer);
         }
-    }
+    }, [latestRecordingUri]);
 
-    async function stopRecording() {
-        if (!recording) return;
-        setRecording(null);
-        await recording.stopAndUnloadAsync();
-        const uri = recording.getURI();
-        setAudioUri(uri);
-        // Reset sound if exists
-        if (sound) {
-            await sound.unloadAsync();
-            setSound(null);
-        }
-    }
-
-    async function playSound(pitch: 'LOW' | 'NORMAL' | 'HIGH') {
-        if (!audioUri) return;
-
-        // Visual feedback
-        setSelectedPitch(pitch);
-
-        try {
-            // Ensure we can play
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: false,
-                playsInSilentModeIOS: true,
-            });
-
-            // If sound is already playing, stop and unload it first
-            if (sound) {
-                await sound.unloadAsync();
-            }
-
-            const { sound: newSound } = await Audio.Sound.createAsync({ uri: audioUri });
-            setSound(newSound);
-
-            // Pitch/Rate logic
-            if (pitch === 'HIGH') {
-                await newSound.setRateAsync(1.5, false);
-            } else if (pitch === 'LOW') {
-                await newSound.setRateAsync(0.7, false);
+    const handlePlayLatest = () => {
+        if (latestRecordingUri) {
+            if (isPlaying) {
+                stopSound();
             } else {
-                await newSound.setRateAsync(1.0, true);
+                playSound(latestRecordingUri, 'NORMAL');
             }
-
-            await newSound.playAsync();
-        } catch (error) {
-            console.error('Failed to play sound', error);
-            Alert.alert('Error', 'Failed to play sound');
         }
-    }
+    };
 
     return (
         <SafeAreaView style={styles.container}>
             <Text style={styles.title}>Voice Changer</Text>
 
-            {/* Recording Area */}
+            {/* Status Message Area */}
+            <View style={styles.messageContainer}>
+                {showSavedMessage && (
+                    <Animated.View style={{ opacity: fadeAnim }}>
+                        <Text style={styles.savedText}>Recording Saved! 🎉</Text>
+                    </Animated.View>
+                )}
+            </View>
+
             <View style={styles.recordContainer}>
                 <TouchableOpacity
                     style={[styles.recordButton, recording && styles.recordingActive]}
@@ -132,63 +90,40 @@ export default function VoiceChangerApp() {
                 <Text style={styles.statusText}>
                     {recording ? "Recording..." : "Tap to Record"}
                 </Text>
+
+                {/* Immediate Playback Controls */}
+                {!recording && latestRecordingUri && (
+                    <View style={styles.playbackContainer}>
+                        <TouchableOpacity
+                            style={styles.playButton}
+                            onPress={handlePlayLatest}
+                        >
+                            <FontAwesome
+                                name={isPlaying ? "stop" : "play"}
+                                size={24}
+                                color="white"
+                            />
+                            <Text style={styles.playButtonText}>
+                                {isPlaying ? "Stop" : "Play Last Recording"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
             </View>
 
-            {/* Pitch Selection / Playback Triggers */}
-            <Text style={styles.instructionText}>
-                {audioUri ? "Tap an icon to play!" : "Record first!"}
-            </Text>
-            <View style={styles.effectsContainer}>
-                <EffectButton
-                    type="LOW"
-                    icon="paw"
-                    color="#3F51B5"
-                    label="Monster"
-                    selected={selectedPitch === 'LOW'}
-                    onPress={() => playSound('LOW')}
-                    disabled={!audioUri}
-                />
-                <EffectButton
-                    type="NORMAL"
-                    icon="smile-o"
-                    color="#4CAF50"
-                    label="Normal"
-                    selected={selectedPitch === 'NORMAL'}
-                    onPress={() => playSound('NORMAL')}
-                    disabled={!audioUri}
-                />
-                <EffectButton
-                    type="HIGH"
-                    icon="rocket"
-                    color="#E91E63"
-                    label="Alien"
-                    selected={selectedPitch === 'HIGH'}
-                    onPress={() => playSound('HIGH')}
-                    disabled={!audioUri}
-                />
+            <View style={styles.navigationContainer}>
+                <TouchableOpacity
+                    style={styles.listButton}
+                    onPress={() => router.push('/recordings' as any)}
+                >
+                    <FontAwesome name="list-ul" size={24} color="white" style={{ marginRight: 10 }} />
+                    <Text style={styles.listButtonText}>Go to Recordings</Text>
+                </TouchableOpacity>
             </View>
 
-            {/* Spacer to keep layout balanced without Play button */}
-            <View style={{ height: 100 }} />
+            {/* Spacer */}
+            <View style={{ height: 50 }} />
         </SafeAreaView>
-    );
-}
-
-function EffectButton({ type, icon, color, label, selected, onPress, disabled }: any) {
-    return (
-        <TouchableOpacity
-            style={[
-                styles.effectButton,
-                { backgroundColor: color },
-                selected && styles.effectButtonSelected,
-                disabled && styles.effectButtonDisabled
-            ]}
-            onPress={onPress}
-            disabled={disabled}
-        >
-            <FontAwesome name={icon} size={40} color="white" />
-            <Text style={styles.effectLabel}>{label}</Text>
-        </TouchableOpacity>
     );
 }
 
@@ -205,12 +140,23 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#0288D1',
         marginTop: 20,
-        fontFamily: Platform.OS === 'ios' ? 'Marker Felt' : 'sans-serif-medium', // Kid friendly font if available
+        fontFamily: Platform.OS === 'ios' ? 'Marker Felt' : 'sans-serif-medium',
+    },
+    messageContainer: {
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    savedText: {
+        fontSize: 20,
+        color: '#4CAF50',
+        fontWeight: 'bold',
     },
     recordContainer: {
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 20,
+        flex: 1,
     },
     recordButton: {
         width: 120,
@@ -231,49 +177,47 @@ const styles = StyleSheet.create({
         borderColor: '#FFCDD2',
     },
     statusText: {
-        marginTop: 15,
-        fontSize: 20,
+        marginTop: 20,
+        fontSize: 24,
         color: '#555',
         fontWeight: '600',
     },
-    instructionText: {
-        fontSize: 18,
-        color: '#757575',
-        marginBottom: 10,
-        fontWeight: '500',
+    playbackContainer: {
+        marginTop: 30,
+        alignItems: 'center',
     },
-    effectsContainer: {
+    playButton: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
-        width: '100%',
-        paddingHorizontal: 20,
+        backgroundColor: '#2196F3',
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 25,
+        alignItems: 'center',
+        elevation: 3,
     },
-    effectButton: {
-        width: 90,
-        height: 90,
-        borderRadius: 20,
+    playButtonText: {
+        color: 'white',
+        fontSize: 18,
+        fontWeight: '600',
+        marginLeft: 10,
+    },
+    navigationContainer: {
+        width: '100%',
+        paddingHorizontal: 40,
+        marginBottom: 20,
+    },
+    listButton: {
+        flexDirection: 'row',
+        backgroundColor: '#009688',
+        padding: 15,
+        borderRadius: 30,
         alignItems: 'center',
         justifyContent: 'center',
         elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-        opacity: 0.9,
     },
-    effectButtonSelected: {
-        transform: [{ scale: 1.1 }],
-        borderWidth: 3,
-        borderColor: 'white',
-        elevation: 10,
-    },
-    effectButtonDisabled: {
-        opacity: 0.3,
-        backgroundColor: '#BDBDBD',
-    },
-    effectLabel: {
+    listButtonText: {
         color: 'white',
-        marginTop: 5,
+        fontSize: 20,
         fontWeight: 'bold',
     },
 });
