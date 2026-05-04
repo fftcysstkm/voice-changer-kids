@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RecordingsScreen() {
     const router = useRouter();
-    const { recordings, deleteRecording, renameRecording, refreshRecordings } = useVoiceRecorder();
+    const { recordings, deleteRecording, renameRecording } = useVoiceRecorder();
     const { playSound, stopSound, isPlaying, playingUri, selectedPitch } = useVoicePlayer();
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
