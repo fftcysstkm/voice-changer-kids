@@ -1,5 +1,5 @@
 import { Audio } from 'expo-av';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import { deleteRecording, getRecordings, renameRecording, saveRecording } from '../utils/fileManager';
 
@@ -14,20 +14,20 @@ export function useVoiceRecorder() {
     const [latestRecordingUri, setLatestRecordingUri] = useState<string | null>(null);
     const [permissionResponse, requestPermission] = Audio.usePermissions();
 
-    useEffect(() => {
-        loadRecordings();
-    }, []);
-
-    const loadRecordings = async () => {
+    const loadRecordings = useCallback(async () => {
         try {
             const files = await getRecordings();
             setRecordings(files.reverse()); // Newest first
         } catch (error) {
             console.error('Failed to load recordings', error);
         }
-    };
+    }, []);
 
-    async function startRecording() {
+    useEffect(() => {
+        loadRecordings();
+    }, [loadRecordings]);
+
+    const startRecording = useCallback(async () => {
         try {
             // Reset latest recording status when starting new one
             setLatestRecordingUri(null);
@@ -53,9 +53,9 @@ export function useVoiceRecorder() {
             console.error('Failed to start recording', err);
             Alert.alert('Error', 'Failed to start recording');
         }
-    }
+    }, [permissionResponse?.status, requestPermission]);
 
-    async function stopRecording() {
+    const stopRecording = useCallback(async () => {
         if (!recording) return;
 
         try {
@@ -79,18 +79,18 @@ export function useVoiceRecorder() {
             console.error('Failed to stop/save recording', error);
             Alert.alert('Error', 'Failed to save recording');
         }
-    }
+    }, [loadRecordings, recording]);
 
-    const handleDelete = async (filename: string) => {
+    const handleDelete = useCallback(async (filename: string) => {
         try {
             await deleteRecording(filename);
             await loadRecordings();
         } catch (error) {
             Alert.alert('Error', 'Failed to delete recording');
         }
-    };
+    }, [loadRecordings]);
 
-    const handleRename = async (oldName: string, newName: string) => {
+    const handleRename = useCallback(async (oldName: string, newName: string) => {
         try {
             // Ensure extension is kept or added if missing
             let finalName = newName;
@@ -103,7 +103,7 @@ export function useVoiceRecorder() {
         } catch (error) {
             Alert.alert('Error', 'Failed to rename recording');
         }
-    };
+    }, [loadRecordings]);
 
     return {
         recording,

@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 export default function VoiceChangerApp() {
     const router = useRouter();
     const { recording, startRecording, stopRecording, latestRecordingUri } = useVoiceRecorder();
-    const { playSound, stopSound, isPlaying, playingUri } = useVoicePlayer();
+    const { playSound, stopSound, isPlaying } = useVoicePlayer();
 
     // State for showing the "Saved" message
     const [showSavedMessage, setShowSavedMessage] = useState(false);
@@ -27,7 +27,7 @@ export default function VoiceChangerApp() {
         return () => {
             if (timer) clearTimeout(timer);
         };
-    }, [recording]);
+    }, [recording, stopRecording]);
 
     // Effect to handle "Saved" message visibility and fading
     useEffect(() => {
@@ -51,7 +51,7 @@ export default function VoiceChangerApp() {
 
             return () => clearTimeout(hideTimer);
         }
-    }, [latestRecordingUri]);
+    }, [fadeAnim, latestRecordingUri]);
 
     const handlePlayLatest = () => {
         if (latestRecordingUri) {
