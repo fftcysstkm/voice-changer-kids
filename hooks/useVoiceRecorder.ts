@@ -1,5 +1,5 @@
 import { Audio } from 'expo-av';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import {
     deleteRecording,
@@ -23,6 +23,7 @@ export function useVoiceRecorder() {
     const [latestRecordingUri, setLatestRecordingUri] = useState<string | null>(null);
     const [storageStatus, setStorageStatus] = useState<RecordingStorageStatus | null>(null);
     const [permissionResponse, requestPermission] = Audio.usePermissions();
+    const isStoppingRef = useRef(false);
 
     const loadStorageStatus = useCallback(async () => {
         try {
@@ -76,7 +77,11 @@ export function useVoiceRecorder() {
     }, [permissionResponse?.status, requestPermission]);
 
     const stopRecording = useCallback(async () => {
-        if (!recording) return;
+        if (!recording || isStoppingRef.current) {
+            return false;
+        }
+
+        isStoppingRef.current = true;
 
         try {
             // 1. Stop recording
@@ -94,11 +99,16 @@ export function useVoiceRecorder() {
 
                 // Alert removed as requested
                 // Alert.alert('Saved', 'Recording saved successfully!');
+                return true;
             }
         } catch (error) {
             console.error('Failed to stop/save recording', error);
-            Alert.alert('Error', 'Failed to save recording');
+            Alert.alert('Error', 'Failed to save recording', [{ text: 'OK' }]);
+        } finally {
+            isStoppingRef.current = false;
         }
+
+        return false;
     }, [loadRecordings, recording]);
 
     const handleDelete = useCallback(async (filename: string) => {
