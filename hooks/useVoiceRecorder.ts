@@ -1,7 +1,16 @@
 import { Audio } from 'expo-av';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
-import { deleteRecording, getRecordings, renameRecording, saveRecording } from '../utils/fileManager';
+import {
+    deleteRecording,
+    getRecordingStorageStatus,
+    getRecordings,
+    RecordingStorageStatus,
+    renameRecording,
+    resetRecordingStorageLocation,
+    saveRecording,
+    selectExternalRecordingFolder,
+} from '../utils/fileManager';
 
 export interface RecordingFile {
     name: string;
@@ -12,7 +21,17 @@ export function useVoiceRecorder() {
     const [recording, setRecording] = useState<Audio.Recording | null>(null);
     const [recordings, setRecordings] = useState<RecordingFile[]>([]);
     const [latestRecordingUri, setLatestRecordingUri] = useState<string | null>(null);
+    const [storageStatus, setStorageStatus] = useState<RecordingStorageStatus | null>(null);
     const [permissionResponse, requestPermission] = Audio.usePermissions();
+
+    const loadStorageStatus = useCallback(async () => {
+        try {
+            const status = await getRecordingStorageStatus();
+            setStorageStatus(status);
+        } catch (error) {
+            console.error('Failed to load recording storage status', error);
+        }
+    }, []);
 
     const loadRecordings = useCallback(async () => {
         try {
@@ -24,8 +43,9 @@ export function useVoiceRecorder() {
     }, []);
 
     useEffect(() => {
+        loadStorageStatus();
         loadRecordings();
-    }, [loadRecordings]);
+    }, [loadRecordings, loadStorageStatus]);
 
     const startRecording = useCallback(async () => {
         try {
@@ -105,14 +125,43 @@ export function useVoiceRecorder() {
         }
     }, [loadRecordings]);
 
+    const chooseExternalFolder = useCallback(async () => {
+        try {
+            const location = await selectExternalRecordingFolder();
+            if (location) {
+                await loadStorageStatus();
+                await loadRecordings();
+            }
+            return location;
+        } catch (error) {
+            console.error('Failed to select external recording folder', error);
+            Alert.alert('Error', 'Failed to select recording folder');
+            return null;
+        }
+    }, [loadRecordings, loadStorageStatus]);
+
+    const useAppStorage = useCallback(async () => {
+        try {
+            await resetRecordingStorageLocation();
+            await loadStorageStatus();
+            await loadRecordings();
+        } catch (error) {
+            console.error('Failed to reset recording storage location', error);
+            Alert.alert('Error', 'Failed to reset recording folder');
+        }
+    }, [loadRecordings, loadStorageStatus]);
+
     return {
         recording,
         recordings,
         latestRecordingUri,
+        storageStatus,
         startRecording,
         stopRecording,
         deleteRecording: handleDelete,
         renameRecording: handleRename,
+        chooseExternalFolder,
+        useAppStorage,
         refreshRecordings: loadRecordings
     };
 }

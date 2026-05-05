@@ -18,7 +18,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function RecordingsScreen() {
     const router = useRouter();
-    const { recordings, deleteRecording, renameRecording } = useVoiceRecorder();
+    const {
+        recordings,
+        deleteRecording,
+        renameRecording,
+        storageStatus,
+        chooseExternalFolder,
+        useAppStorage,
+    } = useVoiceRecorder();
     const { playSound, stopSound, isPlaying, playingUri, selectedPitch } = useVoicePlayer();
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
@@ -41,6 +48,20 @@ export default function RecordingsScreen() {
             await renameRecording(oldName, editName);
         }
         setEditingId(null);
+    };
+
+    const handleChooseExternalFolder = async () => {
+        const location = await chooseExternalFolder();
+        if (location) {
+            Alert.alert('Saved', 'New recordings will be saved to the selected Android Files folder.');
+        }
+    };
+
+    const handleUseAppStorage = () => {
+        Alert.alert('Use App Storage', 'New recordings will be saved inside the app again.', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'OK', onPress: useAppStorage },
+        ]);
     };
 
     const renderItem = ({ item }: { item: RecordingFile }) => {
@@ -129,6 +150,34 @@ export default function RecordingsScreen() {
                 keyExtractor={(item) => item.name}
                 renderItem={renderItem}
                 contentContainerStyle={styles.listContent}
+                ListHeaderComponent={
+                    storageStatus?.canSelectExternal ? (
+                        <View style={styles.storagePanel}>
+                            <View style={styles.storageTextArea}>
+                                <Text style={styles.storageLabel}>Save Location</Text>
+                                <Text style={styles.storageValue}>{storageStatus.label}</Text>
+                            </View>
+                            <View style={styles.storageButtons}>
+                                <TouchableOpacity
+                                    onPress={handleChooseExternalFolder}
+                                    style={styles.storageButton}
+                                >
+                                    <FontAwesome name="folder-open" size={18} color="white" />
+                                    <Text style={styles.storageButtonText}>Files</Text>
+                                </TouchableOpacity>
+                                {storageStatus.location.type === 'external' && (
+                                    <TouchableOpacity
+                                        onPress={handleUseAppStorage}
+                                        style={[styles.storageButton, styles.secondaryStorageButton]}
+                                    >
+                                        <FontAwesome name="mobile" size={18} color="#0288D1" />
+                                        <Text style={styles.secondaryStorageButtonText}>App</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+                    ) : null
+                }
                 ListEmptyComponent={
                     <Text style={styles.emptyText}>No recordings yet!</Text>
                 }
@@ -171,6 +220,62 @@ const styles = StyleSheet.create({
     },
     listContent: {
         padding: 20,
+    },
+    storagePanel: {
+        backgroundColor: 'white',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 15,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 2,
+    },
+    storageTextArea: {
+        flex: 1,
+    },
+    storageLabel: {
+        fontSize: 12,
+        color: '#757575',
+        marginBottom: 4,
+    },
+    storageValue: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+    },
+    storageButtons: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    storageButton: {
+        minWidth: 74,
+        minHeight: 42,
+        borderRadius: 21,
+        paddingHorizontal: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: 6,
+        backgroundColor: '#0288D1',
+    },
+    storageButtonText: {
+        color: 'white',
+        fontWeight: '700',
+    },
+    secondaryStorageButton: {
+        backgroundColor: '#E1F5FE',
+        borderWidth: 1,
+        borderColor: '#81D4FA',
+    },
+    secondaryStorageButtonText: {
+        color: '#0288D1',
+        fontWeight: '700',
     },
     card: {
         backgroundColor: 'white',
