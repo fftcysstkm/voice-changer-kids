@@ -20,8 +20,10 @@ export default function VoiceChangerApp() {
         let timer: ReturnType<typeof setTimeout>;
         if (recording) {
             timer = setTimeout(async () => {
-                await stopRecording();
-                Alert.alert('お知らせ', '30秒経過したため録音を終了しました');
+                const saved = await stopRecording();
+                if (saved) {
+                    Alert.alert('お知らせ', '30秒経過したため録音を終了しました');
+                }
             }, 30000);
         }
         return () => {
