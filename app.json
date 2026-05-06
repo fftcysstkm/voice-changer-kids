@@ -28,6 +28,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/withAndroidPitchPlayer",
       [
         "expo-splash-screen",
         {

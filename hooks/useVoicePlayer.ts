@@ -1,12 +1,38 @@
 import { Audio } from 'expo-av';
 import { useEffect, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, NativeEventEmitter, NativeModules, Platform } from 'react-native';
+
+type Pitch = 'LOW' | 'NORMAL' | 'HIGH';
+
+type AndroidPitchPlayerModule = {
+    play: (uri: string, pitch: number) => Promise<void>;
+    stop: () => Promise<void>;
+    addListener: (eventName: string) => void;
+    removeListeners: (count: number) => void;
+};
+
+const androidPitchPlayer =
+    Platform.OS === 'android'
+        ? (NativeModules.AndroidPitchPlayer as AndroidPitchPlayerModule | undefined)
+        : undefined;
+
+const androidPitchEvents = androidPitchPlayer ? new NativeEventEmitter(androidPitchPlayer) : undefined;
+
+const getPitchScale = (pitch: Pitch) => {
+    if (pitch === 'HIGH') {
+        return 1.5;
+    }
+    if (pitch === 'LOW') {
+        return 0.7;
+    }
+    return 1.0;
+};
 
 export function useVoicePlayer() {
     const [sound, setSound] = useState<Audio.Sound | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [playingUri, setPlayingUri] = useState<string | null>(null);
-    const [selectedPitch, setSelectedPitch] = useState<'LOW' | 'NORMAL' | 'HIGH'>('NORMAL');
+    const [selectedPitch, setSelectedPitch] = useState<Pitch>('NORMAL');
 
     // Cleanup sound on unmount/change
     useEffect(() => {
@@ -17,7 +43,31 @@ export function useVoicePlayer() {
             : undefined;
     }, [sound]);
 
-    async function playSound(uri: string, pitch: 'LOW' | 'NORMAL' | 'HIGH') {
+    useEffect(() => {
+        if (!androidPitchEvents) {
+            return undefined;
+        }
+
+        const finishSubscription = androidPitchEvents.addListener('AndroidPitchPlayerFinished', () => {
+            setIsPlaying(false);
+            setPlayingUri(null);
+        });
+        const errorSubscription = androidPitchEvents.addListener('AndroidPitchPlayerError', () => {
+            setIsPlaying(false);
+            setPlayingUri(null);
+            Alert.alert('Error', 'Failed to play sound');
+        });
+
+        return () => {
+            finishSubscription.remove();
+            errorSubscription.remove();
+            androidPitchPlayer?.stop().catch((error) => {
+                console.error('Failed to stop native pitch player', error);
+            });
+        };
+    }, []);
+
+    async function playSound(uri: string, pitch: Pitch) {
         try {
             // Update state for UI
             setPlayingUri(uri);
@@ -33,22 +83,17 @@ export function useVoicePlayer() {
             // Unload previous sound if any
             if (sound) {
                 await sound.unloadAsync();
+                setSound(null);
+            }
+
+            if (androidPitchPlayer) {
+                await androidPitchPlayer.stop();
+                await androidPitchPlayer.play(uri, getPitchScale(pitch));
+                return;
             }
 
             const { sound: newSound } = await Audio.Sound.createAsync({ uri });
             setSound(newSound);
-
-            // Pitch/Rate logic
-            // Note: setRateAsync(rate, shouldCorrectPitch)
-            // shouldCorrectPitch = true means change speed but keep pitch?
-            // Wait, Voice Changer usually WANTS to change pitch.
-            // High pitch = faster speed usually in simple implementations?
-            // Actually:
-            // High pitch (Alien) -> higher rate (1.5), pitch correction depends on desired effect.
-            // Original app logic:
-            // HIGH: rate 1.5, correct false (chipmunk effect)
-            // LOW: rate 0.7, correct false (slow/monster effect)
-            // NORMAL: rate 1.0, correct true
 
             if (pitch === 'HIGH') {
                 await newSound.setRateAsync(1.5, false);
@@ -77,11 +122,16 @@ export function useVoicePlayer() {
     }
 
     const stopSound = async () => {
+        if (androidPitchPlayer) {
+            await androidPitchPlayer.stop();
+        }
         if (sound) {
             await sound.stopAsync();
             setIsPlaying(false);
             setPlayingUri(null);
         }
+        setIsPlaying(false);
+        setPlayingUri(null);
     }
 
     return {
