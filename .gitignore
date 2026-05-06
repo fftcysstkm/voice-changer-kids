@@ -10,15 +10,11 @@ node_modules/
 dist/
 web-build/
 
-# Native app/generated directory (uncomment if you are not using Prebuild)
-# /ios
-# /android
-
-# However, for managed workflow users who haven't run 'prebuild', these folders might not exist or shouldn't be committed if you want to keep it managed. 
-# But if you ran prebuild locally to debug, you might keep them or ignore them depending on your workflow. 
-# The default Expo template ignores them to keep the repo clean for Managed workflow.
+# Native app/generated directory.
+# This project tracks the Android native project because Android-specific Kotlin
+# code is part of the app. Build outputs and local Gradle files are ignored by
+# android/.gitignore.
 /ios
-/android
 
 # Certificates
 *.jks
