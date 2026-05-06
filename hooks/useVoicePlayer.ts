@@ -92,6 +92,10 @@ export function useVoicePlayer() {
                 return;
             }
 
+            if (Platform.OS === 'android' && pitch !== 'NORMAL') {
+                throw new Error('Android native pitch player is not available.');
+            }
+
             const { sound: newSound } = await Audio.Sound.createAsync({ uri });
             setSound(newSound);
 
