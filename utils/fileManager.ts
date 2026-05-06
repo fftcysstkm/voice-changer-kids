@@ -134,6 +134,11 @@ const findExternalRecordingUri = async (directoryUri: string, filename: string) 
     return files.find((file) => file.name === filename)?.uri ?? null;
 };
 
+const findExternalRecordingUriByNames = async (directoryUri: string, filenames: string[]) => {
+    const files = await getExternalRecordings(directoryUri);
+    return files.find((file) => filenames.includes(file.name)) ?? null;
+};
+
 export const getRecordings = async () => {
     const storageLocation = await readStorageLocation();
 
@@ -230,9 +235,14 @@ export const saveRecording = async (uri: string) => {
         });
         await FileSystem.deleteAsync(uri, { idempotent: true });
 
+        const savedFile = await findExternalRecordingUriByNames(storageLocation.directoryUri, [
+            filename,
+            getFileNameFromUri(targetUri),
+        ]);
+
         return {
-            name: getFileNameFromUri(targetUri),
-            uri: targetUri,
+            name: savedFile?.name ?? getFileNameFromUri(targetUri),
+            uri: savedFile?.uri ?? targetUri,
         };
     }
 
