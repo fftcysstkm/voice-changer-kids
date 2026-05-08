@@ -54,8 +54,46 @@ npm run web
 npm run lint
 ```
 
+型チェックが必要な変更では以下も実行してください。
+
+```bash
+npx tsc --noEmit
+```
+
 画面表示や録音・再生などの挙動を変更した場合は、Expo Go を使ってスマホ実機でも確認してください。
 WSL や Termux と PC を組み合わせて開発している場合は、`--tunnel` の利用を推奨します。
+
+Android ネイティブ連携や `android/` 配下を変更した場合は、Expo Go では確認できません。
+その場合は APK または開発ビルドで実機確認してください。
+
+## Android / APK ビルド
+
+このプロジェクトは Android ネイティブ連携を含むため、`android/` を git 管理対象にしています。
+`android/.gitignore` により、Gradle キャッシュや APK などのビルド成果物は除外します。
+
+ローカルで release APK を作る場合:
+
+```bash
+cd android
+./gradlew assembleRelease
+```
+
+出力先:
+
+```bash
+android/app/build/outputs/apk/release/app-release.apk
+```
+
+この release APK は現在 debug keystore で署名されています。
+個人確認用には使えますが、正式配布用の署名ではありません。
+
+GitHub Actions で APK を作る場合:
+
+- `.github/workflows/android-apk.yml` を使用します。
+- `main` 向け Pull Request の作成・更新時に実行されます。
+- GitHub の Actions 画面から `workflow_dispatch` で手動実行できます。
+- 成功後、workflow run の `Artifacts` から `app-release` をダウンロードできます。
+- artifact の保存期間は 7 日です。
 
 ## コーディング方針
 
@@ -77,6 +115,10 @@ npx expo start --tunnel
 
 録音ファイルは現在、アプリ専用の保存領域に保存されています。
 Android の Files アプリから見える場所に保存したい場合は、Android の scoped storage の制約があるため、Storage Access Framework や共有・エクスポート機能の利用を検討してください。
+
+音程変更は React Native のみではなく、Android ネイティブ連携で実装しています。
+Android 側の `AndroidPitchPlayerModule.kt` が ExoPlayer を使い、`PlaybackParameters(speed = 1.0f, pitch = ...)` で再生速度を固定したまま音程を変更します。
+`expo-av` が既に依存している ExoPlayer を利用しており、Android 標準の `MediaPlayer` 方式は採用していません。
 
 ## Git 運用
 
