@@ -1,5 +1,6 @@
 import { useVoicePlayer } from '@/hooks/useVoicePlayer';
 import { RecordingFile, useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { prepareRecordingForSharing } from '@/utils/fileManager';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
@@ -30,12 +31,22 @@ export default function RecordingsScreen() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
 
-    const handleShare = async (uri: string) => {
-        if (!(await Sharing.isAvailableAsync())) {
-            Alert.alert('Error', 'Sharing is not available on this device');
-            return;
+    const handleShare = async (file: RecordingFile) => {
+        try {
+            if (!(await Sharing.isAvailableAsync())) {
+                Alert.alert('Error', 'Sharing is not available on this device');
+                return;
+            }
+
+            const shareUri = await prepareRecordingForSharing(file.uri, file.name);
+            await Sharing.shareAsync(shareUri, {
+                dialogTitle: 'Share recording',
+                mimeType: 'audio/mp4',
+            });
+        } catch (error) {
+            console.error('Failed to share recording', error);
+            Alert.alert('Error', 'Failed to share recording');
         }
-        await Sharing.shareAsync(uri);
     };
 
     const startEditing = (file: RecordingFile) => {
@@ -89,7 +100,7 @@ export default function RecordingsScreen() {
                     )}
 
                     <View style={styles.actionButtons}>
-                        <TouchableOpacity onPress={() => handleShare(item.uri)} style={styles.iconBtn}>
+                        <TouchableOpacity onPress={() => handleShare(item)} style={styles.iconBtn}>
                             <FontAwesome name="share-alt" size={20} color="#757575" />
                         </TouchableOpacity>
                         <TouchableOpacity

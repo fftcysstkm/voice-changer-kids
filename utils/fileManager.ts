@@ -39,6 +39,8 @@ const isRecordingFileName = (name: string) => recordingExtensions.some((extensio
 
 const normalizeRecordingName = (name: string) => name.trim();
 
+const sanitizeCacheFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, '_');
+
 const getFileNameFromUri = (uri: string) => {
     const decodedUri = decodeURIComponent(uri);
     const withoutQuery = decodedUri.split('?')[0];
@@ -214,6 +216,28 @@ export const renameRecording = async (oldName: string, newName: string) => {
     if (oldFile.exists) {
         oldFile.rename(finalName);
     }
+};
+
+export const prepareRecordingForSharing = async (uri: string, name: string) => {
+    if (!uri.startsWith('content://')) {
+        return uri;
+    }
+
+    if (!FileSystem.cacheDirectory) {
+        throw new Error('Cache directory is not available.');
+    }
+
+    const base64Contents = await FileSystem.StorageAccessFramework.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+    });
+    const cacheFileName = `${Date.now()}-${sanitizeCacheFileName(name)}`;
+    const cacheUri = `${FileSystem.cacheDirectory}${cacheFileName}`;
+
+    await FileSystem.writeAsStringAsync(cacheUri, base64Contents, {
+        encoding: FileSystem.EncodingType.Base64,
+    });
+
+    return cacheUri;
 };
 
 export const saveRecording = async (uri: string) => {
