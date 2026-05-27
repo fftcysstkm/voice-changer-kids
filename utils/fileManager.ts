@@ -50,6 +50,28 @@ const getFileNameFromUri = (uri: string) => {
     return lastSafPathPart || withoutQuery;
 };
 
+const compareRecordingNamesDescending = (a: { name: string }, b: { name: string }) =>
+    b.name.localeCompare(a.name);
+
+const compareRecordingsByCreationDateDescending = (
+    a: { name: string; creationTime: number | null },
+    b: { name: string; creationTime: number | null }
+) => {
+    if (a.creationTime !== null && b.creationTime !== null && a.creationTime !== b.creationTime) {
+        return b.creationTime - a.creationTime;
+    }
+
+    if (a.creationTime !== null && b.creationTime === null) {
+        return -1;
+    }
+
+    if (a.creationTime === null && b.creationTime !== null) {
+        return 1;
+    }
+
+    return compareRecordingNamesDescending(a, b);
+};
+
 const readStorageLocation = async (): Promise<RecordingStorageLocation> => {
     if (!storageSettingsFile.exists) {
         return { type: 'app' };
@@ -128,7 +150,8 @@ const getExternalRecordings = async (directoryUri: string) => {
             name: getFileNameFromUri(uri),
             uri,
         }))
-        .filter((file) => isRecordingFileName(file.name));
+        .filter((file) => isRecordingFileName(file.name))
+        .sort(compareRecordingNamesDescending);
 };
 
 const findExternalRecordingUri = async (directoryUri: string, filename: string) => {
@@ -158,8 +181,16 @@ export const getRecordings = async () => {
     return files
         .filter((item): item is File => item instanceof File && isRecordingFileName(item.name))
         .map((file) => ({
-            name: file.name,
-            uri: file.uri,
+            file,
+            creationTime: file.creationTime,
+        }))
+        .sort((a, b) => compareRecordingsByCreationDateDescending(
+            { name: a.file.name, creationTime: a.creationTime },
+            { name: b.file.name, creationTime: b.creationTime }
+        ))
+        .map((file) => ({
+            name: file.file.name,
+            uri: file.file.uri,
         }));
 };
 

@@ -37,7 +37,7 @@ export function useVoiceRecorder() {
     const loadRecordings = useCallback(async () => {
         try {
             const files = await getRecordings();
-            setRecordings(files.reverse()); // Newest first
+            setRecordings(files);
         } catch (error) {
             console.error('Failed to load recordings', error);
         }
